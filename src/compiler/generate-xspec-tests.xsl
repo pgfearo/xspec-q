@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.1" encoding="UTF-8"?>
 <!-- ===================================================================== -->
 <!--  File:       generate-xspec-tests.xsl                                 -->
 <!--  Author:     Jeni Tennsion                                            -->
@@ -27,9 +27,41 @@
 <xsl:namespace-alias stylesheet-prefix="#default" result-prefix="xsl"/>
 
 <xsl:preserve-space elements="x:space" />
-
-<xsl:output indent="yes" encoding="ISO-8859-1" />  
-
+  
+  <xsl:output indent="yes" encoding="ISO-8859-1" version="1.1"/>
+  <xsl:variable name="LF" as="xs:string" select="'&#10;'"/>
+  
+  <xsl:variable name="BLACK" as="xs:string" select="'&#x1B;[0;30m'"/>
+  <xsl:variable name="RED" as="xs:string" select="'&#x1B;[0;31m'"/>
+  <xsl:variable name="GREEN" as="xs:string" select="'&#x1B;[0;32m'"/>
+  <xsl:variable name="YELLOW" as="xs:string" select="'&#x1B;[0;33m'"/>
+  <xsl:variable name="BLUE" as="xs:string" select="'&#x1B;[0;34m'"/>
+  <xsl:variable name="MAGENTA" as="xs:string" select="'&#x1B;[0;35m'"/>
+  <xsl:variable name="CYAN" as="xs:string" select="'&#x1B;[0;36m'"/>
+  <xsl:variable name="WHITE" as="xs:string" select="'&#x1B;[0;37m'"/>
+  <xsl:variable name="RESET" as="xs:string" select="'&#x1B;[0m'"/>
+  
+  <xsl:variable name="X_BLACK" as="xs:string" select="'&#x1B;[0;30'"/>
+  <xsl:variable name="X_RED" as="xs:string" select="'&#x1B;[0;31'"/>
+  <xsl:variable name="X_GREEN" as="xs:string" select="'&#x1B;[0;32'"/>
+  <xsl:variable name="X_YELLOW" as="xs:string" select="'&#x1B;[0;33'"/>
+  <xsl:variable name="X_BLUE" as="xs:string" select="'&#x1B;[0;34'"/>
+  <xsl:variable name="X_MAGENTA" as="xs:string" select="'&#x1B;[0;35'"/>
+  <xsl:variable name="X_CYAN" as="xs:string" select="'&#x1B;[0;36'"/>
+  <xsl:variable name="X_WHITE" as="xs:string" select="'&#x1B;[0;37'"/>
+  <xsl:variable name="X_RESET" as="xs:string" select="'&#x1B;[0m'"/>
+  
+  <xsl:variable name="BLACK_BACKGROUND" as="xs:string" select="';40m'"/>
+  <xsl:variable name="RED_BACKGROUND" as="xs:string" select="';41m'"/>
+  <xsl:variable name="GREEN_BACKGROUND" as="xs:string" select="';42m'"/>
+  <xsl:variable name="YELLOW_BACKGROUND" as="xs:string" select="';43m'"/>
+  <xsl:variable name="BLUE_BACKGROUND" as="xs:string" select="';44m'"/>
+  <xsl:variable name="MAGENTA_BACKGROUND" as="xs:string" select="';45m'"/>
+  <xsl:variable name="CYAN_BACKGROUND" as="xs:string" select="';46m'"/>
+  <xsl:variable name="WHITE_BACKGROUND" as="xs:string" select="';47m'"/>
+  
+  <xsl:variable name="WHITE_BRIGHT" as="xs:string" select="'&#x1B;[0;97m'"/>
+  
 
 <xsl:variable name="xspec-ns" select="'http://www.jenitennison.com/xslt/xspec'"/>
 
@@ -62,12 +94,19 @@
     <xsl:call-template name="x:compile-params"/>
     <!-- The main compiled template. -->
     <template name="x:main">
-      <message>
-        <text>Testing with </text>
-        <value-of select="system-property('xsl:product-name')" />
-        <text><xsl:text> </xsl:text></text>
-        <value-of select="system-property('xsl:product-version')" />
-      </message>
+        <message xsl:expand-text="yes">
+          <text>{$YELLOW}XSpec testing with </text>
+          <value-of select="system-property('xsl:product-name')" />
+          <text><xsl:text> </xsl:text></text>
+          <value-of select="system-property('xsl:product-version')" />
+          <xsl:text>{$RESET}</xsl:text>
+        </message>
+        <variable name="result">
+          <x:report stylesheet="{{$x:stylesheet-uri}}" date="{{current-dateTime()}}">
+            <!-- Generate calls to the compiled top-level scenarios. -->
+            <xsl:call-template name="x:call-scenarios"/>
+          </x:report>
+        </variable>
     	<result-document format="x:report">
 	      <processing-instruction name="xml-stylesheet">
 	        <xsl:text>type="text/xsl" href="</xsl:text>
@@ -79,12 +118,47 @@
 	        that the URI appears in the trace report generated from running the
 	        test stylesheet, which can then be picked up by stylesheets that
 	        process *that* to generate a coverage report -->
-	      <x:report stylesheet="{{$x:stylesheet-uri}}" date="{{current-dateTime()}}">
-                 <!-- Generate calls to the compiled top-level scenarios. -->
-                 <xsl:call-template name="x:call-scenarios"/>
-	      </x:report>
+          <sequence select="$result"/>
     	</result-document>
-    </template>
+        <message/>
+        <message>
+          <call-template name="x:totals">
+            <with-param name="tests" select="$result//x:scenario/x:test" />
+            <with-param name="labels" select="true()" />
+          </call-template>
+        </message>
+      </template>
+      
+      <template name="x:totals" xsl:expand-text="yes">
+        <param name="tests" as="element(x:test)*" required="yes" />
+        <param name="labels" as="xs:boolean" select="false()" />
+        <if test="$tests">
+          <variable name="passed" as="element(x:test)*" select="$tests[@successful = 'true']" />
+          <variable name="pending" as="element(x:test)*" select="$tests[exists(@pending)]" />
+          <variable name="failed" as="element(x:test)*" select="$tests[@successful = 'false']" />
+          <text> -----------{$LF}</text>
+          <if test="$labels"> passed:  </if>
+          <text>{$GREEN}</text>
+          <value-of select="count($passed)" />
+          <text>{$LF}{$RESET}</text>
+          <if test="$labels"><text> </text></if>
+          <if test="$labels"> pending: </if>
+          <text>{$BLACK}</text>
+          <value-of select="count($pending)" />
+          <text>{$LF}{$RESET}</text>
+          <if test="$labels"><text> </text></if>
+          <if test="$labels"> failed:  </if>
+          <text>{$RED}</text>
+          <value-of select="count($failed)" />
+          <text>{$LF}{$RESET}</text>
+          <if test="$labels"><text> </text></if>
+          <text> -----------{$LF}{$WHITE_BRIGHT}</text>
+          <if test="$labels"> total:   </if>
+          <text>{$WHITE_BRIGHT}</text>
+          <value-of select="count($tests)" />
+          <text>{$RESET}</text>
+        </if>
+      </template>
     <!-- Compile the top-level scenarios. -->
     <xsl:call-template name="x:compile-scenarios"/>
   </stylesheet>
@@ -166,20 +240,10 @@
      <xsl:for-each select="$params">
         <param name="{ @name }" required="yes"/>
      </xsl:for-each>
-     <message>
-        <xsl:if test="$pending-p">
-           <xsl:text>PENDING: </xsl:text>
-           <xsl:if test="$pending != ''">
-              <xsl:text>(</xsl:text>
-              <xsl:value-of select="normalize-space($pending)"/>
-              <xsl:text>) </xsl:text>
-           </xsl:if>
-        </xsl:if>
-        <xsl:if test="parent::x:scenario">
-           <xsl:text>..</xsl:text>
-        </xsl:if>
-        <xsl:value-of select="normalize-space(x:label(.))"/>
-     </message>
+      <xsl:if test="self::x:scenario and empty(parent::x:scenario)">
+        <message/>
+        <message xsl:expand-text="yes">{$X_BLACK}{$BLUE_BACKGROUND} {normalize-space(x:label(.))} {$RESET}</message>
+      </xsl:if> 
     <x:scenario>
       <xsl:if test="$pending-p">
         <xsl:attribute name="pending" select="$pending" />
@@ -411,13 +475,13 @@
      <xsl:for-each select="$params">
         <param name="{ @name }" required="{ @required }"/>
      </xsl:for-each>
-    <message>
+      <!-- <message>
       <xsl:if test="$pending-p">
         <xsl:text>PENDING: </xsl:text>
         <xsl:if test="normalize-space($pending) != ''">(<xsl:value-of select="normalize-space($pending)"/>) </xsl:if>
       </xsl:if>
       <xsl:value-of select="normalize-space(x:label(.))"/>
-    </message>
+           </message> -->
     <xsl:if test="not($pending-p)">
       <xsl:variable name="version" as="xs:double" 
         select="(ancestor-or-self::*[@xslt-version]/@xslt-version, 2.0)[1]" />
@@ -472,11 +536,16 @@
             select="test:deep-equal($impl:expected, $x:result, {$version})" />
         </xsl:otherwise>
       </xsl:choose>
-      <if test="not($impl:successful)">
-        <message>
-          <xsl:text>      FAILED</xsl:text>
-        </message>
-      </if>
+        <if test="$impl:successful" xsl:expand-text="yes">
+          <message>
+            <xsl:text>{$GREEN}✔︎ {$BLACK}{x:label(.)}{$RESET}</xsl:text>
+          </message>
+        </if>
+        <if test="not($impl:successful)" xsl:expand-text="yes">
+          <message>
+            <xsl:text>{$RED}✘ {$BLACK}{x:label(.)}{$RESET}</xsl:text>
+          </message>
+        </if>
     </xsl:if>
     <x:test>
       <xsl:choose>
@@ -518,17 +587,6 @@
       <xsl:for-each select="$params">
          <param name="{ @name }" required="{ @required }"/>
       </xsl:for-each>
-      <message>
-         <xsl:if test="$pending-p">
-            <xsl:text>PENDING: </xsl:text>
-            <xsl:if test="normalize-space($pending) != ''">
-               <xsl:text>(</xsl:text>
-               <xsl:value-of select="normalize-space($pending)"/>
-               <xsl:text>) </xsl:text>
-            </xsl:if>
-         </xsl:if>
-         <xsl:value-of select="normalize-space(x:label(.))"/>
-      </message>
       <xsl:variable name="is-assert" select="empty(node()|@select)"/>
       <xsl:if test="not($pending-p)">
          <xsl:variable name="version" as="xs:double" select="
@@ -717,11 +775,16 @@
                </xsl:message>
             </xsl:otherwise>
          </xsl:choose>
-         <if test="not($impl:successful)">
-            <message>
-               <xsl:text>      FAILED</xsl:text>
-            </message>
-         </if>
+        <if test="$impl:successful" xsl:expand-text="yes">
+          <message>
+            <xsl:text>{$GREEN}✔︎ {$BLACK}{x:label(ancestor::*:scenario[1])}{$RESET}</xsl:text>
+          </message>
+        </if>
+        <if test="not($impl:successful)" xsl:expand-text="yes">
+          <message>
+            <xsl:text>{$RED}✘ {$BLACK}{x:label(ancestor::*:scenario[1])}{$RESET}</xsl:text>
+          </message>
+        </if>
       </xsl:if>
       <x:test>
          <xsl:choose>
